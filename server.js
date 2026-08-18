@@ -21,6 +21,19 @@ if (!RELAY_API_KEY) console.warn("WARN: RELAY_API_KEY não configurado — relay
 
 const proxyAgent = PROXY_URL ? new ProxyAgent(PROXY_URL) : undefined;
 
+// Ring buffer de diagnóstico: registra as últimas requisições de proxy que
+// chegaram (host de destino + horário), exposto em GET /stats. Serve pra provar
+// se a edge function do Supabase está realmente chamando o relay.
+const recent = [];
+let proxyCount = 0;
+function noteRequest(targetUrl) {
+  proxyCount++;
+  let host = "";
+  try { host = new URL(targetUrl).host; } catch { host = String(targetUrl).slice(0, 60); }
+  recent.push({ host, at: new Date().toISOString() });
+  if (recent.length > 30) recent.shift();
+}
+
 function send(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -31,6 +44,9 @@ const server = http.createServer((req, res) => {
   // Health check (Render/Railway usam pra saber se subiu, e serve de keep-alive).
   if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
     return send(res, 200, { ok: true, proxy: Boolean(proxyAgent) });
+  }
+  if (req.method === "GET" && req.url === "/stats") {
+    return send(res, 200, { proxyCount, recent });
   }
   if (req.method !== "POST") {
     return send(res, 405, { error: "Method not allowed" });
@@ -59,6 +75,7 @@ const server = http.createServer((req, res) => {
 
     const targetUrl = payload.url;
     if (!targetUrl) return send(res, 400, { error: "Missing url" });
+    noteRequest(targetUrl);
 
     const method = (payload.method || "GET").toUpperCase();
     const headers =
