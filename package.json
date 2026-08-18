@@ -1,0 +1,15 @@
+{
+  "name": "br-proxy-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relay que dá saída no Brasil (via IPRoyal) para o rastreio Movimente/Brudam do Supabase Edge",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "undici": "^6.21.0"
+  }
+}
